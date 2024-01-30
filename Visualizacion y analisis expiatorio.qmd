@@ -1,0 +1,43 @@
+---
+title: "Untitled"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(tsibble)
+library(fabletools)
+library(readxl)
+library(openxlsx)
+```
+
+```{r}
+amzn_csv <- read.csv("AMZN.csv")
+amzn_csv
+```
+
+```{r}
+amzn_csv$Date = ymd(amzn_csv$Date)
+```
+
+```{r}
+amzn <- amzn_csv %>% 
+  as_tsibble(index = Date)
+amzn
+```
+
+```{r}
+class(amzn)
+```
+
+```{r}
+amzn |>
+  autoplot(Close) + 
+  labs(y = "Prices", title = "Historic Prices AMZN")
+
+
+```
+
+\
