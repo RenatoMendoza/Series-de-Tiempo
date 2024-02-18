@@ -1,7 +1,19 @@
 ---
-title: "Untitled"
-format: html
-editor: visual
+title: "Análisis, Visualización y Descomposición AMZN"
+author: 'S. Renato Gonzalez Mendoza'
+date: "Feb 14, 2024"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_document:
+    toc: yes
+    df_print: paged
 ---
 
 ```{r}
@@ -13,15 +25,22 @@ library(readxl)
 library(openxlsx)
 ```
 
+# Descripción de AMZN
+
+Amazon es una de las empresas tecnológicas y de comercio electrónico más grandes del mundo, fundada en 1994 por Jeff Bezos en Seattle, Washington. Inicialmente comenzó como una tienda en línea de libros, pero ha crecido exponencialmente para ofrecer una amplia gama de productos y servicios, incluyendo electrónicos, ropa, alimentos, servicios en la nube, entretenimiento digital, inteligencia artificial y dispositivos de consumo. La empresa se ha expandido globalmente, con presencia en múltiples países y regiones. Amazon es conocida por su enfoque en la innovación, la eficiencia operativa y la atención al cliente. Su plataforma de comercio electrónico, Amazon.com, es una de las más visitadas del mundo. Además, Amazon Web Services (AWS) es uno de los proveedores líderes de servicios en la nube, brindando infraestructura informática a empresas y organizaciones de todos los tamaños. Amazon también ha incursionado en la producción de contenido original a través de su división de entretenimiento, Amazon Studios, y ha desarrollado una serie de dispositivos de hardware populares, como los altavoces inteligentes Echo y los lectores de libros electrónicos Kindle. La empresa está constantemente buscando expandirse en nuevos mercados y áreas de negocio, y su impacto en la economía y la sociedad global es significativo.
+
+# Datos
+
+## Importar
 ```{r}
 amzn_csv <- read.csv("AMZN.csv")
-amzn_csv
 ```
 
+## Cambiar tipo de datos
 ```{r}
 amzn_csv$Date = ymd(amzn_csv$Date)
 ```
-
+## Crear tsibble
 ```{r}
 amzn <- amzn_csv %>% 
   as_tsibble(index = Date)
@@ -31,7 +50,11 @@ amzn
 ```{r}
 class(amzn)
 ```
+# Análisis
 
+## Visualización de la serie
+
+### Time plot
 ```{r}
 amzn |>
   autoplot(Close) + 
@@ -39,5 +62,127 @@ amzn |>
 
 
 ```
+### Patrones y Estacionalidad
+```{r}
+feasts::autoplot(amzn) + ggtitle('Historical graphic AMZN') + ylab('Prices') + xlab('Date')
+```
 
-\
+```{r}
+library(tsibble)
+library(feasts)
+library(plotly)
+```
+
+```{r}
+amzn$Adj.Close = as.numeric(amzn$Adj.Close)
+head(amzn, 2)
+```
+
+```{r}
+amzn_filled <- fill_gaps(amzn)
+amzn_filled %>%
+  gg_season(Adj.Close, labels = "both") +
+  ggtitle('Historical graphic AMZN') + 
+  ylab('Price') + xlab('Date')
+```
+
+```{r}
+yearly_amzn_plot = amzn_filled %>% gg_season(Adj.Close, labels = "both") +
+    ggtitle('Yearly historical graphic AMZN ') + ylab('Date') + xlab('Price')
+
+ggplotly(yearly_amzn_plot)
+```
+### Gráfico de Rezagos
+```{r}
+lags_plots = amzn_filled  %>% 
+  filter(year(Date) > 2022) %>% 
+  gg_lag(Adj.Close, geom = "point", lags = 1:12) + 
+  labs(x ="lag(Precio, k)")
+
+suppressWarnings(ggplotly(lags_plots))
+```
+```{r}
+amzn_filled %>% ACF(Adj.Close, lag_max = 12)
+```
+
+### Autocorrelación
+```{r}
+amzn_filled %>% ACF(Adj.Close, lag_max = 24) %>% autoplot() + labs(title='Historical price AMZN')
+```
+
+# Estadística descriptiva
+```{r}
+summary(amzn$Adj.Close, 'value')
+```
+## Medidas de dispersión
+```{r}
+library(EnvStats)
+```
+
+```{r}
+kurtosis(amzn$Adj.Close)
+```
+```{r}
+skewness(amzn$Adj.Close)
+```
+```{r}
+sd(amzn$Adj.Close)
+```
+```{r}
+var(amzn$Adj.Close)
+```
+
+
+```{r}
+library(ggExtra)
+p <- ggplot(amzn_filled, aes(x=Date, y=Adj.Close)) + 
+        geom_hline(yintercept =25) + 
+        geom_hline(yintercept =150) +
+        geom_point() + 
+        ggtitle('Historical graphic AMZN') + ylab('Price') + xlab('Date')
+
+ggMarginal(p, type='histogram', margins = 'y')
+```
+##
+
+```{r}
+histogram = ggplot(amzn_filled, aes(x = Adj.Close)) +
+  geom_histogram( bins = 20, fill = "black", color = "black", alpha = 0.5) +
+  labs(title = "Histograma",
+       x = "Price",
+       y = "Densidad")
+
+ggplotly(histogram)
+```
+
+## Valores atípicos
+
+```{r}
+p <- amzn_filled %>% as_tibble %>% group_by(years=year(Date)) %>%
+    summarise(precios=sum(Adj.Close)) %>%
+    arrange(desc(years))%>%
+    mutate(change = (precios/lead(precios) - 1) * 100) %>% 
+    filter(years > 2000) %>% 
+    filter(years < 2023)
+
+mean_growth <- amzn_filled %>% as_tibble %>% group_by(years=year(Date)) %>%
+                    summarise(precios=sum(Adj.Close)) %>%
+                    arrange(desc(years))%>%
+                    mutate(change = (precios/lead(precios) - 1) * 100) %>% 
+                    filter(years > 2000) %>% 
+                    filter(years < 2023) %>%
+                    summarise(mean(change))
+
+mean_growth <- mean_growth$`mean(change)`
+
+ggplot(p, aes(x=years, y=change)) +
+    geom_line() +
+    geom_hline(yintercept=mean_growth) +
+    geom_hline(yintercept=0) +
+    ggtitle('Cambio porcentual por año') + ylab('%') + xlab('Mes')
+```
+
+```{r}
+
+```
+
