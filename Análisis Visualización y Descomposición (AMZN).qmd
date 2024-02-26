@@ -32,15 +32,19 @@ Amazon es una de las empresas tecnológicas y de comercio electrónico más gran
 # Datos
 
 ## Importar
+
 ```{r}
 amzn_csv <- read.csv("AMZN.csv")
 ```
 
 ## Cambiar tipo de datos
+
 ```{r}
 amzn_csv$Date = ymd(amzn_csv$Date)
 ```
+
 ## Crear tsibble
+
 ```{r}
 amzn <- amzn_csv %>% 
   as_tsibble(index = Date)
@@ -50,11 +54,13 @@ amzn
 ```{r}
 class(amzn)
 ```
+
 # Análisis
 
 ## Visualización de la serie
 
 ### Time plot
+
 ```{r}
 amzn |>
   autoplot(Close) + 
@@ -62,7 +68,9 @@ amzn |>
 
 
 ```
+
 ### Patrones y Estacionalidad
+
 ```{r}
 feasts::autoplot(amzn) + ggtitle('Historical graphic AMZN') + ylab('Prices') + xlab('Date')
 ```
@@ -92,7 +100,9 @@ yearly_amzn_plot = amzn_filled %>% gg_season(Adj.Close, labels = "both") +
 
 ggplotly(yearly_amzn_plot)
 ```
+
 ### Gráfico de Rezagos
+
 ```{r}
 lags_plots = amzn_filled  %>% 
   filter(year(Date) > 2022) %>% 
@@ -101,20 +111,25 @@ lags_plots = amzn_filled  %>%
 
 suppressWarnings(ggplotly(lags_plots))
 ```
+
 ```{r}
 amzn_filled %>% ACF(Adj.Close, lag_max = 12)
 ```
 
 ### Autocorrelación
+
 ```{r}
 amzn_filled %>% ACF(Adj.Close, lag_max = 24) %>% autoplot() + labs(title='Historical price AMZN')
 ```
 
 # Estadística descriptiva
+
 ```{r}
 summary(amzn$Adj.Close, 'value')
 ```
+
 ## Medidas de dispersión
+
 ```{r}
 library(EnvStats)
 ```
@@ -122,16 +137,18 @@ library(EnvStats)
 ```{r}
 kurtosis(amzn$Adj.Close)
 ```
+
 ```{r}
 skewness(amzn$Adj.Close)
 ```
+
 ```{r}
 sd(amzn$Adj.Close)
 ```
+
 ```{r}
 var(amzn$Adj.Close)
 ```
-
 
 ```{r}
 library(ggExtra)
@@ -143,7 +160,8 @@ p <- ggplot(amzn_filled, aes(x=Date, y=Adj.Close)) +
 
 ggMarginal(p, type='histogram', margins = 'y')
 ```
-##
+
+## 
 
 ```{r}
 histogram = ggplot(amzn_filled, aes(x = Adj.Close)) +
@@ -157,7 +175,11 @@ ggplotly(histogram)
 
 ## Valores atípicos
 ```{r}
-amzn_filled2$Adj.Close <- ifelse(is.na(amzn_filled$Adj.Close), 0, amzn_filled2$Adj.Close)
+amzn_filled2 <- amzn_filled
+```
+
+```{r}
+amzn_filled2$Adj.Close <- ifelse(is.na(amzn_filled2$Adj.Close), 0, amzn_filled2$Adj.Close)
 ```
 
 ```{r}
@@ -195,6 +217,7 @@ frcst_prds <- 6
 ```
 
 ## Seasonal Naive
+
 ```{r}
 library(fable)
 models_fit <- train %>% 
@@ -213,13 +236,16 @@ train %>%
 ```
 
 # Descomposición
+
 ## Componentes y descomposición STL
+
 ```{r}
 stl_model = amzn_filled2 %>% dplyr::select(Adj.Close) %>% stl(s.window = 'per')
 plot(stl_model,main = 'Descomposicón de la serie con STL')
 ```
 
 ## Transformaciones y Ajustes
+
 ```{r}
 qqnorm(amzn_filled$Adj.Close)
 qqline(amzn_filled$Adj.Close)
@@ -253,6 +279,7 @@ snaive_plot <- models_tst %>% autoplot(filter_index(amzn, "2023 Jan" ~ .)) +
 
 snaive_plot
 ```
+
 ```{r}
 library(fable)
 models_fit <- train %>% 
@@ -267,6 +294,7 @@ snaive_plot <- models_tst %>% autoplot(filter_index(amzn, "2023 Jan" ~ .)) +
 
 snaive_plot
 ```
+
 ```{r}
 models_fit <- train %>% 
   model(
@@ -287,10 +315,8 @@ snaive_plot
 ```
 
 ```{r}
-train %>% 
-  model(decomposition_model(
-            STL(log(Adj.Close) ~ trend(window = 12), robust = TRUE),
-            NAIVE(season_adjust))) %>% 
-  gg_tsresiduals()
+amzn %>% 
+  gpglot(aes(x = Date, y = Adj.Close)) + 
+  labs(y = "Yearly AMZN price"),
+       x = 
 ```
-
